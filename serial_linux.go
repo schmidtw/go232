@@ -80,7 +80,7 @@ var parityMap = map[byte]uint32{
 
 // Serial structure
 type Serial struct {
-	Name string	// The filename of the serial port
+	Name string // The filename of the serial port
 	file *os.File
 }
 
@@ -121,7 +121,6 @@ func validateConfig(baud int, cfg string) (rate, flags uint32, err error) {
 
 	return rate, flags, nil
 }
-
 
 // Close closes the serial port or returns an error if one happens
 func (s *Serial) Close() error {
@@ -224,4 +223,13 @@ func (s *Serial) SendBreak() error {
 	}
 
 	return nil
+}
+
+// FindSerialPorts finds and lists the available serial ports
+func FindSerialPorts() ([]string, error) {
+	f, err := os.Open("/dev/serial/by-id")
+	if nil != err {
+		return nil, err
+	}
+	return f.Readdirnames(0)
 }
