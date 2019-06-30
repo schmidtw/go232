@@ -80,8 +80,13 @@ var parityMap = map[byte]uint32{
 
 // Serial structure
 type Serial struct {
-	Name string // The filename of the serial port
-	file *os.File
+	Name      string // The filename of the serial port
+	Baud      int    // The baud rate
+	Config    string // The configuration is a string in the form: '8N1' or similar.
+	Canonical bool
+	Vmin      byte
+	Vtime     byte
+	file      *os.File
 }
 
 func (s *Serial) ioctl(req, arg uintptr) unix.Errno {
@@ -94,7 +99,7 @@ func (s *Serial) ioctl(req, arg uintptr) unix.Errno {
 	return errno
 }
 
-func validateConfig(baud int, cfg string) (rate, flags uint32, err error) {
+func validateConfig(baud int, cfg string, canonical bool) (rate, flags uint32, err error) {
 	if tmp, ok := baudMap[baud]; ok {
 		rate = tmp
 	} else {
@@ -116,7 +121,11 @@ func validateConfig(baud int, cfg string) (rate, flags uint32, err error) {
 	if tmp, ok := stopBitsMap[cfg[2]]; ok {
 		flags |= tmp
 	} else {
-		return 0, 0, fmt.Errorf("Invalid parity parameter.")
+		return 0, 0, fmt.Errorf("Invalid stop bits parameter.")
+	}
+
+	if canonical {
+		flags |= unix.ICANON
 	}
 
 	return rate, flags, nil
@@ -135,12 +144,12 @@ func (s *Serial) Close() error {
 // SetBaud sets the baud rate for the serial port as well as the rest of
 // the configuration.  The configuration is a string in the form: '8N1' or
 // similar.
-func (s *Serial) SetBaud(baud int, cfg string) error {
+func (s *Serial) UpdateCfg() error {
 	if nil == s.file {
 		return fmt.Errorf("Serial port '%s' not open.", s.Name)
 	}
 
-	rate, flags, err := validateConfig(baud, cfg)
+	rate, flags, err := validateConfig(s.Baud, s.Config, s.Canonical)
 	if nil != err {
 		return err
 	}
@@ -152,8 +161,8 @@ func (s *Serial) SetBaud(baud int, cfg string) error {
 		Ospeed: rate,
 	}
 
-	t.Cc[unix.VMIN] = 1
-	t.Cc[unix.VTIME] = 4
+	t.Cc[unix.VMIN] = s.Vmin
+	t.Cc[unix.VTIME] = s.Vtime
 
 	errno := s.ioctl(uintptr(unix.TCSETS), uintptr(unsafe.Pointer(&t)))
 
@@ -176,7 +185,7 @@ func (s *Serial) Open() error {
 	}
 	s.file = f
 
-	return nil
+	return s.UpdateCfg()
 }
 
 // Write an array of bytes and return the number of bytes written
@@ -227,9 +236,18 @@ func (s *Serial) SendBreak() error {
 
 // FindSerialPorts finds and lists the available serial ports
 func FindSerialPorts() ([]string, error) {
+	var list []string
+
 	f, err := os.Open("/dev/serial/by-id")
-	if nil != err {
-		return nil, err
+	if nil == err {
+		names, err := f.Readdirnames(0)
+		if nil == err {
+			for _, v := range names {
+				full := "/dev/serial/by-id/" + v
+				list = append(list, full)
+			}
+		}
 	}
-	return f.Readdirnames(0)
+
+	return list, err
 }
