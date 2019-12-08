@@ -22,6 +22,7 @@ package serial
 import (
 	"fmt"
 	"os"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -85,7 +86,7 @@ type Serial struct {
 	Config    string // The configuration is a string in the form: '8N1' or similar.
 	Canonical bool
 	Vmin      byte
-	Vtime     byte
+	Vtime     time.Duration
 	file      *os.File
 }
 
@@ -161,8 +162,17 @@ func (s *Serial) UpdateCfg() error {
 		Ospeed: rate,
 	}
 
+	var vtime int64
+	vtime = s.Vtime.Nanoseconds() / 1e8
+	if vtime < 1 {
+		vtime = 1
+	}
+	if 255 < vtime {
+		vtime = 255
+	}
+
 	t.Cc[unix.VMIN] = s.Vmin
-	t.Cc[unix.VTIME] = s.Vtime
+	t.Cc[unix.VTIME] = uint8(vtime)
 
 	errno := s.ioctl(uintptr(unix.TCSETS), uintptr(unsafe.Pointer(&t)))
 
