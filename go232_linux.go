@@ -15,9 +15,9 @@
  *
  */
 
-// Package serial provides a simple but usable way to interact with devices
+// Package go232 provides a simple but usable way to interact with devices
 // that have serial ports.
-package serial
+package go232
 
 import (
 	"fmt"
