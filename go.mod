@@ -1,4 +1,4 @@
-module github.com/schmidtw/go-serial
+module github.com/schmidtw/go-serial/serial
 
 go 1.13
 
